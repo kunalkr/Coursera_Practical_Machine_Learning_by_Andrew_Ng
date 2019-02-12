@@ -38,29 +38,32 @@ Theta2_grad = zeros(size(Theta2));
 %         variable J. After implementing Part 1, you can verify that your
 %         cost function computation is correct by verifying the cost
 %         computed in ex4.m
-%
 
-% Prepare First Layer
-a1 = [ones(m, 1) X];
+% Foward propagation
+% a1 = X;
+X = [ones(m,1) X]; % 5000*401
+z2 = Theta1 * X'; % (25*401)*(401*5000)
+a2 = sigmoid(z2); % (25*5000)
 
-% Prepare Second Layer
-z2 = (a1 * Theta1');
-a2 = [ones(m, 1) sigmoid(z2)];
+a2 = [ones(m,1) a2'];
+z3 = Theta2 * a2';
+h_theta = sigmoid(z3); % h_theta equals a3
 
-% Prepare Third Layer
-z3 = (a2 * Theta2');
-a3 = sigmoid(z3);
+y_new = zeros(num_labels, m); % 10*5000
+for i=1:m,
+  y_new(y(i),i)=1;
+end
 
-% Prepare label vector
-y_vec = eye(num_labels)(y, :);
+J = (1/m) * sum ( sum ( (-y_new) .* log(h_theta) - (1-y_new) .* log(1-h_theta) ));
 
-% Prepare Cost Function
-J = (1/m) * (-sum(sum(y_vec .* log(a3))) - sum(sum((1 - y_vec) .* (log(1 - a3)))));
+% Regularize matrices excluding first column of bias
+t1 = Theta1(:,2:size(Theta1,2));
+t2 = Theta2(:,2:size(Theta2,2));
 
-% Prepare Regularization Function
-Reg = (lambda/(2*m)) * ((sum(sum(Theta1(:, 2:end).^2))) + sum(sum(Theta2(:, 2:end).^2)));
+% Regularization
+Reg = lambda  * (sum( sum ( t1.^ 2 )) + sum( sum ( t2.^ 2 ))) / (2*m);
 
-% Punish Cost Function with Regularization
+% Regularized cost function
 J = J + Reg;
 
 % Part 2: Implement the backpropagation algorithm to compute the gradients
@@ -77,38 +80,38 @@ J = J + Reg;
 %         Hint: We recommend implementing backpropagation using a for-loop
 %               over the training examples if you are implementing it for the 
 %               first time.
-%
 
-y_vec = y_vec';
+% Back propagation
+for t=1:m
 
-for t = 1:m
-	% Step : 1
-	X_bias = [ones(m, 1) X];
-	a1 = X_bias(t, :);
-	a1 = a1';
+    % Step 1
+	a1 = X(t,:); % X already have a bias
+	a1 = a1'; % (401*1)
+	z2 = Theta1 * a1; % (25*401)*(401*1)
+	a2 = sigmoid(z2); % (25*1)
+    
+	a2 = [1 ; a2]; % adding a bias (26*1)
+	z3 = Theta2 * a2; % (10*26)*(26*1)
+	a3 = sigmoid(z3); % activation layer a3 == h(theta) (10*1)
+    
+    % Step 2
+	delta_3 = a3 - y_new(:,t); % (10*1)
+	z2=[1; z2]; % bias (26*1)
 
-	z2 = Theta1 * a1;
-	a2 = sigmoid(z2);
+    % Step 3
+	delta_2 = (Theta2' * delta_3) .* sigmoidGradient(z2); % ((26*10)*(10*1))=(26*1)
 
-	a2 = [1 ; a2];
+    % Step 4
+	delta_2 = delta_2(2:end); % skipping sigma2(0) (25*1)
 
-	z3 = Theta2 * a2;
-	a3 = sigmoid(z3);
-
-	% Step : 2
-	delta_3 = a3 - y_vec(:, t);
-	
-	z2 = [1 ; z2];
-
-	% Step : 3
-	delta_2 = (Theta2' * delta_3) .* sigmoidGradient(z2);
-
-	% Step : 4
-	delta_2 = delta_2(2 : end);
-
-	Theta1_grad = Theta1_grad + delta_2 * a1';
-	Theta2_grad = Theta2_grad + delta_3 * a2';
+	Theta2_grad = Theta2_grad + delta_3 * a2'; % (10*1)*(1*26)
+	Theta1_grad = Theta1_grad + delta_2 * a1'; % (25*1)*(1*401)
 end;
+
+% Step 5
+Theta2_grad = (1/m) * Theta2_grad; % (10*26)
+Theta1_grad = (1/m) * Theta1_grad; % (25*401)
+
 
 % Part 3: Implement regularization with the cost function and gradients.
 %
@@ -116,15 +119,18 @@ end;
 %               backpropagation. That is, you can compute the gradients for
 %               the regularization separately and then add them to Theta1_grad
 %               and Theta2_grad from Part 2.
-%
 
+% Regularization
 
-% -------------------------------------------------------------
-
-% =========================================================================
+% Theta1_grad(:, 1) = Theta1_grad(:, 1) ./ m; % for j = 0
+% 
+Theta1_grad(:, 2:end) = Theta1_grad(:, 2:end) + ((lambda/m) * Theta1(:, 2:end)); % for j >= 1 
+% 
+% Theta2_grad(:, 1) = Theta2_grad(:, 1) ./ m; % for j = 0
+% 
+Theta2_grad(:, 2:end) = Theta2_grad(:, 2:end) + ((lambda/m) * Theta2(:, 2:end)); % for j >= 1
 
 % Unroll gradients
 grad = [Theta1_grad(:) ; Theta2_grad(:)];
-
 
 end
